@@ -6,25 +6,29 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
-const apiURL = "https://platsbanken-api.arbetsformedlingen.se/jobs/v1/search"
+const searchURL = "https://platsbanken-api.arbetsformedlingen.se/jobs/v1/search"
 const occupationGroup = "DJh5_yyF_hEM"
 const region = "CifL_Rzy_Mku"
 const maxRecords = 25
+
+const jobDetailsURL = "https://platsbanken-api.arbetsformedlingen.se/jobs/v1/job/"
 
 type JobListing struct {
 	ID         string `json:"id"`
 	Title      string `json:"title"`
 	Occupation string `json:"occupation"`
-	Company    string `json:"company"`
+	Company    string `json:"workplaceName"`
 	Published  bool   `json:"published"`
 	DatePosted string `json:"publishedDate"`
 }
 
 type SearchRequest struct {
 	Filters []Filter `json:"filters"`
-	Size    int      `json:"size"`
+	Size    int      `json:"maxRecords"`
+	Start   int      `json:"startIndex"`
 }
 
 type Filter struct {
@@ -36,70 +40,101 @@ type SearchResponse struct {
 	Ads []JobListing `json:"ads"`
 }
 
-func main() {
+type JobDetails struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Occupation  string `json:"occupation"`
+	Application struct {
+		Reference string `json:"reference"`
+		URL       string `json:"url"`
+	} `json:"application"`
+	Description string `json:"description"`
+}
+
+func jobSearch(occupationGroup, region string, maxRecords int, startIndex int) ([]JobListing, error) {
 	body, err := json.Marshal(SearchRequest{
 		Filters: []Filter{
 			{Type: "occupationGroup", Value: occupationGroup},
 			{Type: "region", Value: region},
 		},
-		Size: maxRecords,
+		Size:  maxRecords,
+		Start: startIndex,
 	})
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, searchURL, bytes.NewReader(body))
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		responseBody, readErr := io.ReadAll(resp.Body)
 		if readErr != nil {
-			panic(readErr)
+			return nil, readErr
 		}
-		panic(fmt.Sprintf("search failed: %s: %s", resp.Status, responseBody))
+		return nil, fmt.Errorf("search failed: %s: %s", resp.Status, responseBody)
 	}
 
 	var searchResponse SearchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&searchResponse); err != nil {
+		return nil, err
+	}
+	return searchResponse.Ads, nil
+}
+
+func jobDetails(jobID string) (*JobDetails, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s%s", jobDetailsURL, jobID), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		responseBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, readErr
+		}
+		return nil, fmt.Errorf("job details request failed: %s: %s", resp.Status, responseBody)
+	}
+
+	var jobDetails JobDetails
+	if err := json.NewDecoder(resp.Body).Decode(&jobDetails); err != nil {
+		return nil, err
+	}
+	return &jobDetails, nil
+}
+
+func main() {
+	ads, err := jobSearch(occupationGroup, region, maxRecords, 0)
+	if err != nil {
 		panic(err)
 	}
+
 	fmt.Println("Title\tOccupation\tCompany\tDate Posted")
-	for _, job := range searchResponse.Ads {
-		// req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://platsbanken-api.arbetsformedlingen.se/jobs/v1/job/%s", job.ID), nil)
-		// if err != nil {
-		// 	panic(err)
-		// }
-		// req.Header.Set("Content-Type", "application/json")
-
-		// resp, err := http.DefaultClient.Do(req)
-		// if err != nil {
-		// 	panic(err)
-		// }
-		// defer resp.Body.Close()
-
-		// if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		// 	responseBody, readErr := io.ReadAll(resp.Body)
-		// 	if readErr != nil {
-		// 		panic(readErr)
-		// 	}
-		// 	panic(fmt.Sprintf("job details request failed: %s: %s", resp.Status, responseBody))
-		// }
-
-		// var jobDetails JobListing
-		// if err := json.NewDecoder(resp.Body).Decode(&jobDetails); err != nil {
-		// 	panic(err)
-		// }
-
+	for _, job := range ads {
 		fmt.Printf("%s\t%s\t%s\t%s\n", job.Title, job.Occupation, job.Company, job.DatePosted)
-		//time.Sleep(1 * time.Second) // Sleep for 1 second to avoid overwhelming the API
+		details, err := jobDetails(job.ID)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("Details for %s:\n", job.Title)
+		fmt.Printf("  ID: %s\n", details.ID)
+		fmt.Printf("  Description: %s\n", details.Description)
+		time.Sleep(5 * time.Second)
 	}
 }
