@@ -135,6 +135,6 @@ func main() {
 		fmt.Printf("Details for %s:\n", job.Title)
 		fmt.Printf("  ID: %s\n", details.ID)
 		fmt.Printf("  Description: %s\n", details.Description)
-		time.Sleep(5 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 }
