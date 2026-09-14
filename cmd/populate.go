@@ -5,9 +5,11 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/wsand02/underwater-ceramic-tech/internal/client"
+	"github.com/wsand02/underwater-ceramic-tech/internal/models"
 )
 
 // TODO: decide on orm library
@@ -43,7 +45,26 @@ func populate(cmd *cobra.Command, args []string) {
 			fmt.Printf("Error fetching details for job ID %s: %v\n", ad.ID, err)
 			continue
 		}
-		fmt.Printf("Job ID: %s\nTitle: %s\nOccupation: %s\nCompany: %s\nPublished: %t\nDate Posted: %s\nDescription: %s\nApplication Reference: %s\nApplication URL: %s\n\n",
+		id, err := strconv.ParseInt(details.ID, 10, 64)
+		if err != nil {
+			fmt.Printf("invalid job ID %q: %v", details.ID, err)
+			continue
+		}
+		job := &models.Job{
+			ID:          id,
+			Title:       details.Title,
+			Occupation:  details.Occupation,
+			Company:     ad.Company,
+			DatePosted:  ad.DatePosted,
+			Description: details.Description,
+			URL:         details.Application.URL,
+			Reference:   details.Application.Reference,
+		}
+		err = job.Upsert()
+		if err != nil {
+			fmt.Printf("Error upserting job ID: %s: %v\n", ad.ID, err)
+		}
+		fmt.Printf("Job ID: %v\nTitle: %s\nOccupation: %s\nCompany: %s\nPublished: %t\nDate Posted: %s\nDescription: %s\nApplication Reference: %s\nApplication URL: %s\n\n",
 			details.ID, details.Title, details.Occupation, ad.Company, ad.Published, ad.DatePosted, details.Description, details.Application.Reference, details.Application.URL)
 	}
 }

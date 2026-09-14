@@ -6,15 +6,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 type JobListingResponse struct {
-	ID         string `json:"id"`
-	Title      string `json:"title"`
-	Occupation string `json:"occupation"`
-	Company    string `json:"workplaceName"`
-	Published  bool   `json:"published"`
-	DatePosted string `json:"publishedDate"`
+	ID         string    `json:"id"`
+	Title      string    `json:"title"`
+	Occupation string    `json:"occupation"`
+	Company    string    `json:"workplaceName"`
+	Published  bool      `json:"published"`
+	DatePosted time.Time `json:"publishedDate"`
 }
 
 type SearchRequest struct {
