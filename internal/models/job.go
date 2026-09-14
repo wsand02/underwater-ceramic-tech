@@ -16,6 +16,9 @@ import (
 // URL
 // Reference
 
+// måste stödja att annonser blir borttagna från af
+// vissa annonser saknar ju url för ansökan pga ansök via mail etc etc måste stödja det, troligtvis via en AFUrl metod där jag konstruerar url till af bara.
+
 const jobSchema = `
 CREATE TABLE IF NOT EXISTS jobs (
 	id bigint PRIMARY KEY,
